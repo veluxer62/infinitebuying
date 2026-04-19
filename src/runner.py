@@ -24,8 +24,17 @@ _SEP = "─" * 60
 
 
 class InfiniteBuyingRunner:
-    def __init__(self, state_mgr: StateManager) -> None:
+    def __init__(
+        self,
+        state_mgr: StateManager,
+        symbol: str = "TQQQ",
+        division: int = 40,
+        default_capital: float = 0.0,
+    ) -> None:
         self.state_mgr = state_mgr
+        self.symbol = symbol
+        self.division = division
+        self.default_capital = default_capital
         self.calc = InfiniteBuyingCalculator()
         self.guide_builder = GuideBuilder()
         self.daily_logger = DailyLogger()
@@ -36,7 +45,7 @@ class InfiniteBuyingRunner:
     # ══════════════════════════════════════════════════════════════════════════
 
     def run(self) -> None:
-        _header("무한매수법 V4.0 가이드 도구  |  TQQQ 40분할")
+        _header(f"무한매수법 V4.0 가이드 도구  |  {self.symbol} {self.division}분할")
 
         state = self._load_or_init_state()
         today = date.today().isoformat()
@@ -263,17 +272,20 @@ class InfiniteBuyingRunner:
         state = self.state_mgr.load_state()
         if state is None:
             print("\n초기 설정을 시작합니다.")
+            print(f"  종목: {self.symbol}  |  분할수: {self.division}")
+            default_hint = f" [{self.default_capital:,.0f}]" if self.default_capital > 0 else ""
             while True:
                 try:
-                    capital = float(input("  투자 원금 (USD): $").strip())
+                    raw = input(f"  투자 원금 (USD){default_hint}: $").strip()
+                    capital = float(raw) if raw else self.default_capital
                     if capital > 0:
                         break
                     print("  0보다 큰 값을 입력하세요.")
                 except ValueError:
                     print("  숫자를 입력하세요.")
-            state = self.state_mgr.create_initial_state("TQQQ", 40, capital)
+            state = self.state_mgr.create_initial_state(self.symbol, self.division, capital)
             self.state_mgr.save_state(state)
-            _info(f"초기 상태 생성 완료. 원금=${capital:,.2f}")
+            _info(f"초기 상태 생성 완료. {self.symbol} {self.division}분할  원금=${capital:,.2f}")
         return state
 
     def _print_status(self, state: PortfolioState, close_price: float) -> None:

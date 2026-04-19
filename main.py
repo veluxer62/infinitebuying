@@ -62,7 +62,12 @@ def main() -> None:
             print("  취소됨.")
         return
 
-    runner = InfiniteBuyingRunner(state_mgr=state_mgr)
+    runner = InfiniteBuyingRunner(
+        state_mgr=state_mgr,
+        symbol=config.get("symbol", "TQQQ"),
+        division=config.get("division", 40),
+        default_capital=config.get("original_capital", 0.0),
+    )
 
     if args.status:
         runner.run_status_only()
