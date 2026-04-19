@@ -76,8 +76,7 @@ class GuideBuilder:
             has_avg_buy = False
             guide_buy_amount = buy_amount
 
-        # 보유량 4주 미만이면 전량을 쿼터매도 수량으로 처리
-        quarter_qty = quantity if quantity < 4 else quantity // 4
+        quarter_qty = quantity // 4
         final_sell_price = calc.calc_final_sell_price(avg_price) if avg_price > 0 else 0.0
 
         return TradeGuide(
