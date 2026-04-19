@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+data/state.json
+data/pending_orders.json
+data/mock_fills.json
+data/logs/
+reports/
+.env
