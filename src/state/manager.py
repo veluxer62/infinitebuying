@@ -44,8 +44,13 @@ class PortfolioState:
 
 
 class StateManager:
-    def __init__(self, state_file: str = "data/state.json") -> None:
+    def __init__(
+        self,
+        state_file: str = "data/state.json",
+        log_dir: str = "data/logs",
+    ) -> None:
         self.state_file = state_file
+        self.log_dir = log_dir
         os.makedirs(os.path.dirname(state_file), exist_ok=True)
 
     def load_state(self) -> Optional[PortfolioState]:
@@ -78,3 +83,8 @@ class StateManager:
     def reset(self) -> None:
         if os.path.exists(self.state_file):
             os.remove(self.state_file)
+        if os.path.isdir(self.log_dir):
+            for fname in os.listdir(self.log_dir):
+                fpath = os.path.join(self.log_dir, fname)
+                if os.path.isfile(fpath):
+                    os.remove(fpath)

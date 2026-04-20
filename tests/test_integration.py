@@ -470,6 +470,33 @@ class TestStateManagerIntegration:
         mgr.reset()
         assert mgr.load_state() is None
 
+    def test_reset_removes_log_files(self, tmp_path, tqqq_final_state):
+        """reset() 시 log_dir 내 파일도 모두 삭제된다."""
+        log_dir = tmp_path / "logs"
+        log_dir.mkdir()
+        (log_dir / "2025-01-02.md").write_text("log1")
+        (log_dir / "2025-01-03.md").write_text("log2")
+
+        mgr = StateManager(
+            state_file=str(tmp_path / "state.json"),
+            log_dir=str(log_dir),
+        )
+        mgr.save_state(tqqq_final_state)
+        mgr.reset()
+
+        assert mgr.load_state() is None
+        assert list(log_dir.iterdir()) == []
+
+    def test_reset_without_log_dir_does_not_raise(self, tmp_path, tqqq_final_state):
+        """log_dir가 존재하지 않아도 reset()은 예외 없이 동작한다."""
+        mgr = StateManager(
+            state_file=str(tmp_path / "state.json"),
+            log_dir=str(tmp_path / "nonexistent_logs"),
+        )
+        mgr.save_state(tqqq_final_state)
+        mgr.reset()
+        assert mgr.load_state() is None
+
     def test_overwrite_state_with_updated_values(self, tmp_path):
         """상태 파일을 덮어쓰면 최신 값으로 갱신된다."""
         mgr = StateManager(state_file=str(tmp_path / "state.json"))
