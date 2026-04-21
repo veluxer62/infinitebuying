@@ -101,6 +101,94 @@ class InfiniteBuyingRunner:
         if state.quantity == 0 and state.T > 0:
             self._handle_cycle_complete(state, close_price)
 
+    def run_regen_log(self) -> None:
+        """--regen-log: 상태 변경 없이 지정 날짜의 로그 파일만 재생성.
+
+        제약조건:
+        - state.last_run_date 가 target_date 와 일치해야 한다.
+          일치하지 않으면 state가 아직 갱신되지 않은 것이므로 일반 실행을 안내한다.
+        - 로그 파일이 존재하고 state 와 일치하면 재생성을 거부한다.
+          로그가 없거나 불일치할 때만 재생성을 진행한다.
+        """
+        import os
+
+        state = self.state_mgr.load_state()
+        if state is None:
+            print("  상태 파일 없음. 먼저 일반 실행으로 초기화하세요.")
+            return
+
+        default_date = state.last_run_date or date.today().isoformat()
+        date_input = input(f"  재생성할 날짜 (YYYY-MM-DD) [{default_date}]: ").strip()
+        target_date = date_input if date_input else default_date
+
+        # ── 제약 1: state가 해당 날짜로 갱신되어 있어야 한다 ──
+        if state.last_run_date != target_date:
+            _warn(
+                f"state 마지막 실행일({state.last_run_date})이 "
+                f"요청 날짜({target_date})와 다릅니다."
+            )
+            print("  해당 날짜의 데이터가 state에 반영되지 않았습니다.")
+            print("  python main.py 를 실행하여 먼저 데이터를 입력하세요.")
+            return
+
+        # ── 제약 2: 로그가 존재하고 state와 일치하면 재생성 불필요 ──
+        log_path = os.path.join(self.daily_logger.log_dir, f"{target_date}.md")
+        if os.path.exists(log_path):
+            if _log_matches_state(log_path, state):
+                _info("로그 파일이 이미 state와 일치합니다. 재생성 불필요.")
+                return
+            _warn("로그 파일의 내용이 state와 불일치합니다. 재생성을 진행합니다.")
+
+        close_price = _input_float("종가(USD)를 입력하세요: $")
+        trades = self._input_trades_readonly(state)
+
+        guide = self.guide_builder.build(
+            remaining_cash=state.remaining_cash,
+            T=state.T,
+            avg_price=state.avg_price,
+            quantity=state.quantity,
+            close_price=close_price,
+        )
+
+        saved = self.daily_logger.log(target_date, state, close_price, trades, guide)
+        _info(f"로그 재생성 완료 → {saved}")
+
+    def _input_trades_readonly(self, state: PortfolioState) -> list[TradeRecord]:
+        """상태를 변경하지 않고 체결 내역만 입력받는다."""
+        trades: list[TradeRecord] = []
+
+        print(f"\n{_SEP}")
+        print("  체결된 매매가 있으면 입력하세요.")
+        print("  [b] 매수  [q] 쿼터매도  [f] 최종매도  [n] 없음 (Enter)")
+        print(f"{_SEP}")
+
+        while True:
+            cmd = input("  선택: ").strip().lower()
+            if cmd in ("", "n"):
+                break
+            elif cmd == "b":
+                t = self._input_buy_trade(state, 0.0)
+                if t:
+                    trades.append(t)
+            elif cmd == "q":
+                t = self._input_quarter_sell_trade(state)
+                if t:
+                    trades.append(t)
+            elif cmd == "f":
+                t = self._input_final_sell_trade(state)
+                if t:
+                    trades.append(t)
+                break
+            else:
+                print("  b / q / f / n 중에 입력하세요.")
+                continue
+
+            more = input("  추가 입력? (y/n): ").strip().lower()
+            if more != "y":
+                break
+
+        return trades
+
     def run_status_only(self) -> None:
         """--status: 포트폴리오 현황만 출력 (상태 변경 없음)."""
         state = self.state_mgr.load_state()
@@ -355,6 +443,50 @@ def _warn(msg: str) -> None:
 
 def _confirm(msg: str) -> bool:
     return input(f"\n  {msg} (y/n): ").strip().lower() == "y"
+
+
+def _log_matches_state(log_path: str, state: "PortfolioState") -> bool:
+    """로그 파일의 핵심 수치가 state와 일치하는지 확인한다."""
+    import re
+
+    try:
+        with open(log_path, encoding="utf-8") as f:
+            text = f.read()
+    except OSError:
+        return False
+
+    def _extract(pattern: str) -> str | None:
+        m = re.search(pattern, text)
+        return m.group(1) if m else None
+
+    def _close_enough(a: float, b: float, tol: float = 0.005) -> bool:
+        return abs(a - b) <= tol
+
+    raw_cash = _extract(r"\| 잔금 \| \$([\d,]+\.\d+)")
+    raw_avg = _extract(r"\| 평균단가 \| \$([\d,]+\.\d+)")
+    raw_qty = _extract(r"\| 보유수량 \| (\d+)주")
+    raw_T = _extract(r"\| T값 \| ([\d.]+) /")
+    raw_profit = _extract(r"\| 누적 실현손익 \| \$([\d,]+\.\d+)")
+
+    if any(v is None for v in (raw_cash, raw_avg, raw_qty, raw_T, raw_profit)):
+        return False
+
+    try:
+        log_cash = float(raw_cash.replace(",", ""))
+        log_avg = float(raw_avg.replace(",", ""))
+        log_qty = int(raw_qty)
+        log_T = float(raw_T)
+        log_profit = float(raw_profit.replace(",", ""))
+    except (ValueError, AttributeError):
+        return False
+
+    return (
+        _close_enough(log_cash, state.remaining_cash)
+        and _close_enough(log_avg, state.avg_price)
+        and log_qty == state.quantity
+        and _close_enough(log_T, state.T)
+        and _close_enough(log_profit, state.total_realized_profit)
+    )
 
 
 def _input_float(prompt: str) -> float:

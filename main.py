@@ -5,6 +5,7 @@
     python main.py              # 일반 실행 (오늘 종가/체결 입력 → 내일 가이드 출력)
     python main.py --status     # 현재 포트폴리오 상태만 출력
     python main.py --reset      # 상태 초기화 (신중히 사용)
+    python main.py --regen-log  # 로그 재생성 (상태 변경 없이 지정 날짜 로그만 다시 작성)
     python main.py --config PATH  # 설정 파일 경로 지정 (기본: config.yaml)
 """
 from __future__ import annotations
@@ -38,6 +39,11 @@ def parse_args() -> argparse.Namespace:
         help="상태 파일 초기화 (주의: 복구 불가)",
     )
     parser.add_argument(
+        "--regen-log",
+        action="store_true",
+        help="로그 재생성 (상태 변경 없이 지정 날짜 로그만 다시 작성)",
+    )
+    parser.add_argument(
         "--config",
         default="config.yaml",
         help="설정 파일 경로 (기본: config.yaml)",
@@ -52,6 +58,16 @@ def main() -> None:
     state_mgr = StateManager(
         state_file=config.get("state_file", "data/state.json"),
     )
+
+    if args.regen_log:
+        runner = InfiniteBuyingRunner(
+            state_mgr=state_mgr,
+            symbol=config.get("symbol", "TQQQ"),
+            division=config.get("division", 40),
+            default_capital=config.get("original_capital", 0.0),
+        )
+        runner.run_regen_log()
+        return
 
     if args.reset:
         ans = input("상태를 초기화하면 복구할 수 없습니다. 계속하시겠습니까? (yes 입력): ").strip()
