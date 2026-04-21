@@ -94,6 +94,6 @@ class GuideBuilder:
             quarter_sell_price=star_price,
             quarter_sell_quantity=quarter_qty,
             final_sell_price=final_sell_price,
-            final_sell_quantity=quantity,
+            final_sell_quantity=quantity - quarter_qty,
             has_sell=quantity > 0,
         )

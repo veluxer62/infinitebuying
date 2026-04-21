@@ -78,4 +78,4 @@ def test_final_sell_price(builder):
         close_price=50.0,
     )
     assert guide.final_sell_price == pytest.approx(50.0 * 1.15, abs=0.01)
-    assert guide.final_sell_quantity == 30
+    assert guide.final_sell_quantity == 23  # 30 - (30 // 4)
