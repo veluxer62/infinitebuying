@@ -68,13 +68,15 @@ class GuideBuilder:
             avg_buy_price = round(avg_price, 2)
             avg_buy_qty = int(half / ref)
             has_avg_buy = True
-            guide_buy_amount = half
+            guide_buy_amount = buy_qty * buy_price
+            guide_avg_buy_amount = avg_buy_qty * avg_buy_price
         else:
             buy_qty = int(buy_amount / ref)
             avg_buy_price = 0.0
             avg_buy_qty = 0
             has_avg_buy = False
-            guide_buy_amount = buy_amount
+            guide_buy_amount = buy_qty * buy_price
+            guide_avg_buy_amount = 0.0
 
         quarter_qty = quantity // 4
         final_sell_price = calc.calc_final_sell_price(avg_price) if avg_price > 0 else 0.0
@@ -88,7 +90,7 @@ class GuideBuilder:
             buy_amount=guide_buy_amount,
             buy_quantity=buy_qty,
             avg_buy_price=avg_buy_price,
-            avg_buy_amount=buy_amount / 2,
+            avg_buy_amount=guide_avg_buy_amount,
             avg_buy_quantity=avg_buy_qty,
             has_avg_buy=has_avg_buy,
             quarter_sell_price=star_price,
